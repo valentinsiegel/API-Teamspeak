@@ -1,0 +1,129 @@
+<script src="../js/jquery.js"></script>
+<script>
+function kick(cluid) {
+		//console.log(id);
+		if(confirm('Êtes-vous sûr(e) de vouloir kicker le client ?')) {
+			$.ajax({
+				url :'_kick.php',
+				type: 'POST',
+				data: { cluid: cluid}
+			});
+		}
+	}
+
+function slide(cid){
+	$("#"+cid).stop().slideToggle();
+}
+</script>
+
+<style>
+	.lvl1 { background-color:red; }
+	.lvl2 { background-color:blue; }
+	.user { margin-left: 10px}
+	.lvl3 { background-color:green; }
+</style>
+
+<?php
+require_once("ts3admin.php");
+/****
+AFFICHAGE DES UTILISATEURS
+*****/
+
+/**
+	$channel 		-> informations sur le chan
+	$lvl 			-> niveau du chan ["lvl1", "lvl2", "lvl3"]
+	$clientList 	-> liste des utilisateurs du chan
+	$ts 			-> Instance de $ts (pour les clientInfos)
+**/
+function showUserList($channel, $lvl, $clientList, $ts){
+	$nbUsers = $channel["total_clients"];
+	// Prépare l'ajout de la div s'il existe des utilisateurs
+	$temp = "<div class='user' id='".$channel["cid"]."' style='display: none;'>";
+	$display = "";
+	foreach($clientList["data"] as $client) {
+		if($client["cid"] == $channel["cid"]) {
+			if($client["client_type"] == 0) {
+				// Si l'utilisateur n'est pas de type serveradmin, le rajoute dans $temp
+				$temp .= "<div>".$client["client_nickname"];
+				$temp .= "<input type='button' onclick=kick('".$ts->clientInfo($client["clid"])["data"]["client_unique_identifier"]."');>";
+				//$temp .= $client["clid"];
+				$temp .= "</div>";
+			}
+			else
+				$nbUsers--;
+			
+		}
+	}
+	// Ferme la div de temp
+	$temp .= "</div>";
+
+	// Prépare la div d'information avec les utilisateurs / nom chan / ...
+	$display .="<div class='".$lvl."' onclick=slide(".$channel["cid"].");>".$channel["channel_name"]."(".$nbUsers.")</div>";
+
+	// Si, après le passage de la boucle, le nbUser est != de 0
+		// c'est qu'il y a des utilisateurs sur le cannal
+	if($nbUsers != 0)
+		$display = $display . $temp;
+	return $display;	
+}
+
+$ts = new ts3admin("nisuha.fr", 10011);
+if($ts->getElement('success', $ts->connect())) {
+	$ts->login("serveradmin", "alligator3");
+	$ts->selectServer(9987);
+
+		// Envoi d'un message
+	//$message = $ts->gm("Test...");
+
+	$channelList = $ts->channelList();
+	$clientList = $ts->clientList();
+	//$files = $ts->clientDbList();
+
+	echo "<div class='lvl1'>Niveau 1</div>";
+	echo "<div class='lvl2'>Niveau 2</div>";
+	echo "<div class='lvl3'>Niveau 3</div>";
+
+	echo "<h1>Liste des channels</h1>";
+
+	$display="";
+	$folder = 0;
+	$subfolder = 0;
+
+	if(sizeof($channelList["errors"] == 0)) {
+		foreach($channelList["data"] as $channel) {
+			if($channel["pid"] == 0) {
+				if($channel["total_clients"]==0) {
+					$display.= "<div class='lvl1'>".$channel["channel_name"]."(".$channel["total_clients"].")</div>";	
+				}
+				else {
+					$display.=showUserList($channel, "lvl1", $clientList,$ts);
+				}			
+				$subfolder = $channel["cid"];
+			}			
+			else if($channel["pid"] == $subfolder){		
+				if($channel["total_clients"]==0){
+					$display.= "<div class='lvl2'>".$channel["channel_name"]."(".$channel["total_clients"].")</div>";	
+				}
+				else {
+					//$display.= "<div class='lvl2' onclick=slide(".$channel["cid"].");>".$channel["channel_name"]."(".$channel["total_clients"].")</div>";
+					$display.=showUserList($channel, "lvl2", $clientList,$ts);
+				}
+			}	
+			else {
+				if($channel["total_clients"]==0){
+					$display.= "<div class='lvl3'>".$channel["channel_name"]."(".$channel["total_clients"].")</div>";	
+				}
+				else {
+					//$display.= "<div class='lvl3' onclick=slide(".$channel["cid"].");>".$channel["channel_name"]."(".$channel["total_clients"].")</div>";
+					$display.=showUserList($channel, "lvl3", $clientList,$ts);
+				}
+			}
+			
+		}
+	}
+	else {
+		echo "erreur : " . $channelList["errors"];
+	}
+}
+echo $display;
+?>
